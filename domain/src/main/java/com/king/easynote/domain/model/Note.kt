@@ -12,5 +12,9 @@ data class Note(
     val content: String,
     override val timestamp: Long,
     override val color: Int,
-    @PrimaryKey override val id: Int? = null
+    @PrimaryKey override val id: Int? = null,
+    val type: NoteType,
+    val images: List<String> = emptyList(), // 新增图片URI列表
+    val audioPath: String? = null, // 音频路径
+    val duration: Int = 0 // 音频时长
 ): BaseNote()

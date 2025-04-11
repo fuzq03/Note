@@ -7,6 +7,7 @@ import com.king.easynote.base.presentation.viewmodel.BaseViewModel
 import com.king.easynote.base.ui.theme.noteColors
 import com.king.easynote.domain.exception.NoteException
 import com.king.easynote.domain.model.Note
+import com.king.easynote.domain.model.NoteType
 import com.king.easynote.domain.usecase.NoteUseCases
 import com.king.easynote.presentation.navigation.NavArgumentKey
 import com.king.easynote.presentation.navigation.NavRoute
@@ -60,14 +61,33 @@ class NoteViewModel @Inject constructor(
             is NoteEvent.SaveNote -> {
                 viewModelScope.launch {
                     try {
-                        noteUseCases.saveNote.execute(state.value.toNote(noteId))
-                        // 保存后通知UI
+                        noteUseCases.saveNote.execute(
+                            state.value.toNote(noteId).copy(
+                                type = when {
+                                    state.value.images.isNotEmpty() -> NoteType.IMAGE
+                                    state.value.audioPath != null -> NoteType.AUDIO
+                                    else -> NoteType.TEXT
+                                },
+                                images = state.value.images,
+                                content = when {
+                                    state.value.images.isNotEmpty() -> state.value.imageCaption
+                                    state.value.audioPath != null -> state.value.audioNote
+                                    else -> state.value.content
+                                }
+                            )
+                        )
                         _event.emit(UIEvent.SaveNote)
+//                        noteUseCases.saveNote.execute(state.value.toNote(noteId))
+//                        // 保存后通知UI
+//                        _event.emit(UIEvent.SaveNote)
                     } catch (e: NoteException) {
                         // 保存失败
                         _event.emit(UIEvent.ShowMessage(e.message))
                     }
                 }
+            }
+            is NoteEvent.AddImage -> {
+                internalState.value = state.value.copy(images = state.value.images + event.uri)
             }
             else -> {}
         }
@@ -100,7 +120,7 @@ class NoteViewModel @Inject constructor(
         data class ChangeContent(val content: String) : NoteEvent
         data class ChangeColor(val color: Int) : NoteEvent
         object SaveNote : NoteEvent
-        class AddImage(val uri: String) : NoteEvent
+        data class AddImage(val uri: String) : NoteEvent
         class RemoveImage(val uri: String) : NoteEvent
         class UpdateCaption(val text: String) : NoteEvent
         class RecordAudio(val path: String) : NoteEvent

@@ -1,38 +1,50 @@
 package com.king.easynote.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.rememberImagePainter
 import com.king.easynote.base.ui.theme.noteColors
 import com.king.easynote.domain.model.NoteType
 import com.king.easynote.presentation.component.InputField
 import com.king.easynote.presentation.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /**
  * 笔记 - 保存（修改/增加）
@@ -183,30 +195,90 @@ private fun ImageNoteScreen(
     viewModel: NoteViewModel = hiltViewModel()
 ) {
     val state = viewModel.state.value
+    val context = LocalContext.current
+
+    // 图片选择Launcher
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.onEvent(NoteViewModel.NoteEvent.AddImage(it.toString())) }
+    }
+
+    // 权限请求Launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pickImageLauncher.launch("image/*")
+        } else {
+            // 显示权限被拒绝的提示
+            Toast.makeText(context, "需要存储权限才能选择图片", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { /*TODO 保存*/ }) {
-            Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
+        Column {
+            FloatingActionButton(
+                onClick = {
+                    // 这里应该调用图片选择器
+                    // 检查权限
+                    if (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        pickImageLauncher.launch("image/*")
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    }
+                    viewModel.onEvent(NoteViewModel.NoteEvent.AddImage("图片URI"))
+                },
+                modifier = Modifier.padding(bottom = 8.dp),
+                backgroundColor = MaterialTheme.colors.secondary
+            ) {
+                Icon(Icons.Default.Add, "添加图片")
+            }
+            FloatingActionButton(onClick = { /*TODO 保存*/ }) {
+                Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
+            }
         }
+
     }) {
+        val scope = rememberCoroutineScope()
         Column(Modifier.padding(it)) {
             LazyRow {
                 items(state.images.size) {index ->
-//                    Image(
-//                        model = state.images[index],
-//                        contentDescription = null,
-//                        modifier = Modifier.size(200.dp)
-//                    )
+                    val image = state.images[index]
+                    Image(
+                        painter = rememberImagePainter(
+                            data = image,
+                            builder = {
+                                crossfade(true)
+                            }
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(200.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures(onLongPress = {
+                                    scope.launch {
+                                        viewModel.onEvent(NoteViewModel.NoteEvent.RemoveImage(image))
+                                    }
+                                })
+                            }
+                    )
                 }
             }
 
             TextField(
                 value = state.imageCaption,
-                onValueChange = {viewModel.onEvent(NoteViewModel.NoteEvent.UpdateAudioNote(it))}
+                onValueChange = {viewModel.onEvent(NoteViewModel.NoteEvent.UpdateAudioNote(it))},
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
 }
+
 
 @Composable
 private fun AudioNoteScreen(
