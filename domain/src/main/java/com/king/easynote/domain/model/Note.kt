@@ -1,5 +1,6 @@
 package com.king.easynote.domain.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -13,7 +14,9 @@ data class Note(
     override val timestamp: Long,
     override val color: Int,
     @PrimaryKey override val id: Int? = null,
-    val type: NoteType,
+    val type: NoteType = NoteType.TEXT,
+    val created: Long = 0,
+    @ColumnInfo(name = "images")
     val images: List<String> = emptyList(), // 新增图片URI列表
     val audioPath: String? = null, // 音频路径
     val duration: Int = 0 // 音频时长

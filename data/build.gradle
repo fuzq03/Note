@@ -41,6 +41,7 @@ dependencies {
     testImplementation "junit:junit:$versions.junit"
     androidTestImplementation "androidx.test.ext:junit:$versions.androidExtJunit"
     androidTestImplementation "androidx.test.espresso:espresso-core:$versions.espressoCore"
+    implementation 'com.google.code.gson:gson:2.8.9'
 
     // Room
     implementation "androidx.room:room-runtime:$versions.room"

@@ -174,18 +174,25 @@ fun NoteListContent(
         // 列表项
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(noteList) { note ->
+//                NoteItem(
+//                    note = note,
+//                    modifier = Modifier
+//                        .clip(RoundedCornerShape(16.dp))
+//                        .fillMaxWidth()
+//                        .clickable {
+//                            // 修改笔记
+//                            navController.navigate(NavRoute.NoteRoute.navigateRoute(note.id))
+//                        }) {
+//                    // 点击删除笔记
+//                    navController.navigate(NavRoute.DeleteNoteDialogRoute.navigateRoute(note.id))
+//                }
                 NoteItem(
                     note = note,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .fillMaxWidth()
-                        .clickable {
-                            // 修改笔记
-                            navController.navigate(NavRoute.NoteRoute.navigateRoute(note.id))
-                        }) {
-                    // 点击删除笔记
-                    navController.navigate(NavRoute.DeleteNoteDialogRoute.navigateRoute(note.id))
-                }
+                    onNoteClick = { noteId ->
+                        navController.navigate(NavRoute.NoteRoute.navigateRoute(note.id, note.type))
+                    },
+                    modifier = Modifier.padding(8.dp)
+                )
                 Spacer(modifier = Modifier.padding(bottom = 16.dp))
             }
             // 让底部能向上滑一段距离，避免被遮盖

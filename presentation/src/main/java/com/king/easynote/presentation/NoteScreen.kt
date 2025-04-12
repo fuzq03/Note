@@ -18,9 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -59,6 +57,7 @@ fun NoteScreen(
         navController.currentBackStackEntry?.arguments?.getString("type")
             ?.let { NoteType.valueOf(it) } ?: NoteType.TEXT
     }
+    viewModel.onEvent(NoteViewModel.NoteEvent.SetType(noteType))
 
     when(noteType) {
         NoteType.TEXT -> TextNoteScreen(navController, viewModel)
@@ -231,19 +230,19 @@ private fun ImageNoteScreen(
                     } else {
                         permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                     }
-                    viewModel.onEvent(NoteViewModel.NoteEvent.AddImage("图片URI"))
                 },
                 modifier = Modifier.padding(bottom = 8.dp),
                 backgroundColor = MaterialTheme.colors.secondary
             ) {
                 Icon(Icons.Default.Add, "添加图片")
             }
-            FloatingActionButton(onClick = { /*TODO 保存*/ }) {
+            FloatingActionButton(onClick = { viewModel.onEvent(NoteViewModel.NoteEvent.SaveNote) }) {
                 Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
             }
         }
 
     }) {
+        viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle("图片笔记"))
         val scope = rememberCoroutineScope()
         Column(Modifier.padding(it)) {
             LazyRow {
@@ -272,7 +271,7 @@ private fun ImageNoteScreen(
 
             TextField(
                 value = state.imageCaption,
-                onValueChange = {viewModel.onEvent(NoteViewModel.NoteEvent.UpdateAudioNote(it))},
+                onValueChange = {viewModel.onEvent(NoteViewModel.NoteEvent.UpdateImageCaption(it))},
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -286,8 +285,46 @@ private fun AudioNoteScreen(
     viewModel: NoteViewModel = hiltViewModel()
 ) {
     val state = viewModel.state.value
+    val context = LocalContext.current
+
+    // 录音权限检查
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.onEvent(NoteViewModel.NoteEvent.StartRecording)
+        } else {
+            Toast.makeText(context, "需要录音权限", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(floatingActionButton = {
+        // 录音按钮
+        FloatingActionButton(
+            onClick = {
+                if (ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    if (state.isRecording) {
+                        viewModel.onEvent(NoteViewModel.NoteEvent.StopRecording)
+                    } else {
+                        viewModel.onEvent(NoteViewModel.NoteEvent.StartRecording)
+                    }
+                } else {
+                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
+            backgroundColor = if (state.isRecording) Color.Red else MaterialTheme.colors.secondary
+        ) {
+            Icon(
+                if (state.isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                if (state.isRecording) "停止录音" else "开始录音"
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        // 保存按钮
         FloatingActionButton(onClick = { /*TODO 保存*/ }) {
             Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
         }

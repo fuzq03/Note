@@ -40,7 +40,11 @@ class NoteViewModel @Inject constructor(
                         internalState.value = state.value.copy(
                             title = it.title,
                             content = it.content,
-                            color = it.color
+                            color = it.color,
+                            type = it.type,
+                            imageCaption = it.content,
+                            images = it.images,
+                            //todo:音频类数据结构补全
                         )
                     }
                 }
@@ -49,6 +53,9 @@ class NoteViewModel @Inject constructor(
 
     override fun onEvent(event: NoteEvent) {
         when (event) {
+            is NoteEvent.SetType -> {
+                internalState.value = state.value.copy(type = event.type)
+            }
             is NoteEvent.ChangeTitle -> {
                 internalState.value = state.value.copy(title = event.title)
             }
@@ -58,28 +65,28 @@ class NoteViewModel @Inject constructor(
             is NoteEvent.ChangeColor -> {
                 internalState.value = state.value.copy(color = event.color)
             }
+            is NoteEvent.UpdateImageCaption -> {
+                internalState.value = state.value.copy(imageCaption = event.text)
+            }
             is NoteEvent.SaveNote -> {
                 viewModelScope.launch {
                     try {
+                        val currentState = state.value
                         noteUseCases.saveNote.execute(
                             state.value.toNote(noteId).copy(
-                                type = when {
-                                    state.value.images.isNotEmpty() -> NoteType.IMAGE
-                                    state.value.audioPath != null -> NoteType.AUDIO
-                                    else -> NoteType.TEXT
-                                },
-                                images = state.value.images,
-                                content = when {
-                                    state.value.images.isNotEmpty() -> state.value.imageCaption
-                                    state.value.audioPath != null -> state.value.audioNote
-                                    else -> state.value.content
+                                type = currentState.type,
+                                images = currentState.images,
+                                audioPath = currentState.audioPath,
+                                content = when (currentState.type) {
+                                    NoteType.TEXT -> currentState.content
+                                    NoteType.IMAGE -> currentState.imageCaption
+                                    NoteType.AUDIO -> currentState.audioNote
                                 }
+
                             )
                         )
                         _event.emit(UIEvent.SaveNote)
-//                        noteUseCases.saveNote.execute(state.value.toNote(noteId))
-//                        // 保存后通知UI
-//                        _event.emit(UIEvent.SaveNote)
+
                     } catch (e: NoteException) {
                         // 保存失败
                         _event.emit(UIEvent.ShowMessage(e.message))
@@ -105,8 +112,11 @@ class NoteViewModel @Inject constructor(
         val title: String = "",
         val content: String = "",
         val color: Int = noteColors.random().toArgb(),
+        val type: NoteType = NoteType.TEXT,
         val images: List<String> = emptyList(), // 图片URI列表
         val imageCaption: String = "", // 图片描述
+        val isRecording: Boolean = false, //是否录音
+        val isPlaying: Boolean = false, //音频是否播放
         val audioPath: String = "", // 音频路径
         val duration: Int = 0, // 音频时长(秒)
         val audioNote: String = "" // 音频备注
@@ -116,15 +126,19 @@ class NoteViewModel @Inject constructor(
      * 事件
      */
     sealed interface NoteEvent {
+        data class SetType(val type: NoteType) : NoteEvent
         data class ChangeTitle(val title: String) : NoteEvent
         data class ChangeContent(val content: String) : NoteEvent
         data class ChangeColor(val color: Int) : NoteEvent
         object SaveNote : NoteEvent
         data class AddImage(val uri: String) : NoteEvent
         class RemoveImage(val uri: String) : NoteEvent
-        class UpdateCaption(val text: String) : NoteEvent
-        class RecordAudio(val path: String) : NoteEvent
-        class UpdateAudioNote(val text: String) : NoteEvent
+        class UpdateImageCaption(val text: String) : NoteEvent
+        object StartRecording : NoteEvent
+        object StopRecording : NoteEvent
+        object PlayAudio : NoteEvent
+        object PauseAudio : NoteEvent
+        data class UpdateAudioNote(val note: String) : NoteEvent
     }
 
     /**
