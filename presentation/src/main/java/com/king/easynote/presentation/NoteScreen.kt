@@ -53,16 +53,33 @@ fun NoteScreen(
     viewModel: NoteViewModel = hiltViewModel()
 ) {
 
+    val scaffoldState = rememberScaffoldState()
     val noteType = remember {
         navController.currentBackStackEntry?.arguments?.getString("type")
             ?.let { NoteType.valueOf(it) } ?: NoteType.TEXT
     }
     viewModel.onEvent(NoteViewModel.NoteEvent.SetType(noteType))
 
+    LaunchedEffect(Unit) {
+        viewModel.event.collectLatest {
+            when (it) {
+                is NoteViewModel.UIEvent.ShowMessage -> {
+                    it.message?.run {
+                        scaffoldState.snackbarHostState.showSnackbar(message = this)
+                    }
+
+                }
+                is NoteViewModel.UIEvent.SaveNote -> {
+                    navController.navigateUp()
+                }
+            }
+        }
+    }
+
     when(noteType) {
-        NoteType.TEXT -> TextNoteScreen(navController, viewModel)
-        NoteType.IMAGE -> ImageNoteScreen(navController, viewModel)
-        NoteType.AUDIO -> AudioNoteScreen(navController, viewModel)
+        NoteType.TEXT -> TextNoteScreen(navController, viewModel, scaffoldState)
+        NoteType.IMAGE -> ImageNoteScreen(navController, viewModel, scaffoldState)
+        NoteType.AUDIO -> AudioNoteScreen(navController, viewModel, scaffoldState)
     }
 
 
@@ -71,11 +88,10 @@ fun NoteScreen(
 @Composable
 fun TextNoteScreen(
     navController: NavController,
-    viewModel: NoteViewModel = hiltViewModel()
+    viewModel: NoteViewModel = hiltViewModel(),
+    scaffoldState: ScaffoldState = rememberScaffoldState()
 ){
     val viewState = viewModel.state.value
-
-    val scaffoldState = rememberScaffoldState()
 
     var backgroundAnim = remember {
         Animatable(Color(viewState.color))
@@ -171,27 +187,13 @@ fun TextNoteScreen(
         )
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.event.collectLatest {
-            when (it) {
-                is NoteViewModel.UIEvent.ShowMessage -> {
-                    it.message?.run {
-                        scaffoldState.snackbarHostState.showSnackbar(message = this)
-                    }
-
-                }
-                is NoteViewModel.UIEvent.SaveNote -> {
-                    navController.navigateUp()
-                }
-            }
-        }
-    }
 }
 
 @Composable
 private fun ImageNoteScreen(
     navController: NavController,
-    viewModel: NoteViewModel = hiltViewModel()
+    viewModel: NoteViewModel = hiltViewModel(),
+    scaffoldState: ScaffoldState = rememberScaffoldState()
 ) {
     val state = viewModel.state.value
     val context = LocalContext.current
@@ -215,31 +217,33 @@ private fun ImageNoteScreen(
         }
     }
 
-    Scaffold(floatingActionButton = {
-        Column {
-            FloatingActionButton(
-                onClick = {
-                    // 这里应该调用图片选择器
-                    // 检查权限
-                    if (ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.READ_EXTERNAL_STORAGE
-                        ) == PackageManager.PERMISSION_GRANTED
-                    ) {
-                        pickImageLauncher.launch("image/*")
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                    }
-                },
-                modifier = Modifier.padding(bottom = 8.dp),
-                backgroundColor = MaterialTheme.colors.secondary
-            ) {
-                Icon(Icons.Default.Add, "添加图片")
+    Scaffold(
+        scaffoldState = scaffoldState,
+        floatingActionButton = {
+            Column {
+                FloatingActionButton(
+                    onClick = {
+                        // 这里应该调用图片选择器
+                        // 检查权限
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.READ_EXTERNAL_STORAGE
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            pickImageLauncher.launch("image/*")
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        }
+                    },
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    backgroundColor = MaterialTheme.colors.secondary
+                ) {
+                    Icon(Icons.Default.Add, "添加图片")
+                }
+                FloatingActionButton(onClick = { viewModel.onEvent(NoteViewModel.NoteEvent.SaveNote) }) {
+                    Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
+                }
             }
-            FloatingActionButton(onClick = { viewModel.onEvent(NoteViewModel.NoteEvent.SaveNote) }) {
-                Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
-            }
-        }
 
     }) {
         viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle("图片笔记"))
@@ -282,10 +286,15 @@ private fun ImageNoteScreen(
 @Composable
 private fun AudioNoteScreen(
     navController: NavController,
-    viewModel: NoteViewModel = hiltViewModel()
+    viewModel: NoteViewModel = hiltViewModel(),
+    scaffoldState: ScaffoldState = rememberScaffoldState()
 ) {
     val state = viewModel.state.value
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.setContext(context)
+    }
 
     // 录音权限检查
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -298,45 +307,67 @@ private fun AudioNoteScreen(
         }
     }
 
-    Scaffold(floatingActionButton = {
-        // 录音按钮
-        FloatingActionButton(
-            onClick = {
-                if (ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
+    Scaffold(
+        scaffoldState = scaffoldState,
+        floatingActionButton = {
+            Column {
+                // 录音按钮
+                FloatingActionButton(
+                    onClick = {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            if (state.isRecording) {
+                                viewModel.onEvent(NoteViewModel.NoteEvent.StopRecording)
+                            } else {
+                                viewModel.onEvent(NoteViewModel.NoteEvent.StartRecording)
+                            }
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    backgroundColor = if (state.isRecording) Color.Red else MaterialTheme.colors.secondary
                 ) {
-                    if (state.isRecording) {
-                        viewModel.onEvent(NoteViewModel.NoteEvent.StopRecording)
-                    } else {
-                        viewModel.onEvent(NoteViewModel.NoteEvent.StartRecording)
-                    }
-                } else {
-                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    Icon(
+                        if (state.isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                        if (state.isRecording) "停止录音" else "开始录音"
+                    )
                 }
-            },
-            backgroundColor = if (state.isRecording) Color.Red else MaterialTheme.colors.secondary
-        ) {
-            Icon(
-                if (state.isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                if (state.isRecording) "停止录音" else "开始录音"
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        // 保存按钮
-        FloatingActionButton(onClick = { /*TODO 保存*/ }) {
-            Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
-        }
+                Spacer(modifier = Modifier.height(8.dp))
+                // 保存按钮
+                FloatingActionButton(onClick = { viewModel.onEvent(NoteViewModel.NoteEvent.SaveNote) }) {
+                    Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
+                }
+            }
     }) {
+        viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle("音频笔记"))
         Column(Modifier.padding(it)) {
-            IconButton(onClick = { /*播放、暂停*/ }) {
-                Icon(Icons.Default.PlayArrow, "播放")
+            // 播放控制
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    if (state.isPlaying) {
+                        viewModel.onEvent(NoteViewModel.NoteEvent.PauseAudio)
+                    } else {
+                        viewModel.onEvent(NoteViewModel.NoteEvent.PlayAudio)
+                    }
+                }) {
+                    Icon(
+                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (state.isPlaying) "暂停" else "播放"
+                    )
+                }
+                Text("${state.duration}秒")
             }
 
-            Text("${state.duration}秒")
-            TextField(value = state.audioNote, onValueChange = {/*更新备注*/})
-
+            // 音频备注
+            TextField(
+                value = state.audioNote,
+                onValueChange = { viewModel.onEvent(NoteViewModel.NoteEvent.UpdateAudioNote(it)) },
+                label = { Text("音频备注") },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

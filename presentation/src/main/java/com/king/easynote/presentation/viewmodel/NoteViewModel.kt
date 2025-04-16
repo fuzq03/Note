@@ -1,6 +1,10 @@
 package com.king.easynote.presentation.viewmodel
 
+import android.content.Context
+import android.media.MediaPlayer
+import android.media.MediaRecorder
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.king.easynote.base.presentation.viewmodel.BaseViewModel
@@ -15,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -28,6 +33,10 @@ class NoteViewModel @Inject constructor(
 
     private val _event = MutableSharedFlow<UIEvent>()
     val event = _event.asSharedFlow()
+    private var mediaRecorder: MediaRecorder? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var startTime: Long = 0
+    private lateinit var context: Context
 
     private var noteId: Int? = null
 
@@ -44,11 +53,19 @@ class NoteViewModel @Inject constructor(
                             type = it.type,
                             imageCaption = it.content,
                             images = it.images,
-                            //todo:音频类数据结构补全
+                            isRecording = it.isRecording, //是否录音
+                            isPlaying = it.isPlaying, //音频是否播放
+                            audioPath = it.audioPath, // 音频路径
+                            duration = it.duration, // 音频时长(秒)
+                            audioNote = it.audioNote // 音频备注
                         )
                     }
                 }
             }
+    }
+
+    fun setContext(context: Context) {
+        this.context = context
     }
 
     override fun onEvent(event: NoteEvent) {
@@ -68,6 +85,13 @@ class NoteViewModel @Inject constructor(
             is NoteEvent.UpdateImageCaption -> {
                 internalState.value = state.value.copy(imageCaption = event.text)
             }
+            is NoteEvent.UpdateAudioNote -> {
+                internalState.value = state.value.copy(audioNote = event.note)
+            }
+            is NoteEvent.StartRecording -> startRecording()
+            is NoteEvent.StopRecording -> stopRecording()
+            is NoteEvent.PlayAudio -> playAudio()
+            is NoteEvent.PauseAudio -> pauseAudio()
             is NoteEvent.SaveNote -> {
                 viewModelScope.launch {
                     try {
@@ -99,10 +123,103 @@ class NoteViewModel @Inject constructor(
             else -> {}
         }
     }
+    private fun startRecording() {
+
+        val cacheDir = context.externalCacheDir ?: run {
+            viewModelScope.launch {
+                _event.emit(UIEvent.ShowMessage("无法访问存储目录"))
+            }
+            return
+        }
+
+        val audioFile = File(cacheDir, "audio_${System.currentTimeMillis()}.mp3").apply {
+            parentFile?.mkdirs()
+        }
+        internalState.value = state.value.copy(audioPath = audioFile.path)
+        mediaRecorder = MediaRecorder().apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+
+            setOutputFile(audioFile.absolutePath)
+
+            prepare()
+            start()
+        }
+        startTime = System.currentTimeMillis()
+        internalState.value = state.value.copy(isRecording = true)
+    }
+
+    private fun stopRecording() {
+        mediaRecorder?.apply {
+            stop()
+            release()
+        }
+        mediaRecorder = null
+
+        val duration = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+        internalState.value = state.value.copy(
+            isRecording = false,
+            duration = duration
+        )
+    }
+
+    private fun playAudio() {
+        val audioPath = state.value.audioPath
+
+        if (audioPath.isNullOrEmpty()) {
+            viewModelScope.launch{
+                _event.emit(UIEvent.ShowMessage("没有可播放的录音文件"))
+            }
+
+            return
+        }
+        val audioFile = File(audioPath)
+        if (!audioFile.exists()) {
+            viewModelScope.launch {
+                _event.emit(UIEvent.ShowMessage("录音文件不存在"))
+            }
+            return
+        }
+
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(audioPath)
+                prepare()
+                start()
+                setOnCompletionListener {
+                    internalState.value = state.value.copy(isPlaying = false)
+                }
+                internalState.value = state.value.copy(isPlaying = true)
+            }
+        } catch (e: Exception) {
+            viewModelScope.launch {
+                _event.emit(UIEvent.ShowMessage("播放失败: ${e.message}"))
+            }
+        }
+    }
+
+    private fun pauseAudio() {
+        mediaPlayer?.pause()
+        internalState.value = state.value.copy(isPlaying = false)
+    }
+
 
 
     private fun NoteState.toNote(noteId: Int?): Note {
-        return Note(title, content, System.currentTimeMillis(), color, noteId)
+        return Note(
+            title,
+            content,
+            System.currentTimeMillis(),
+            color,
+            noteId,
+            isRecording = isRecording,
+            isPlaying = isPlaying,
+            audioPath = audioPath,
+            audioNote = audioNote,
+            duration = duration
+        )
     }
 
     /**

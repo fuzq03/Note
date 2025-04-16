@@ -174,18 +174,6 @@ fun NoteListContent(
         // 列表项
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(noteList) { note ->
-//                NoteItem(
-//                    note = note,
-//                    modifier = Modifier
-//                        .clip(RoundedCornerShape(16.dp))
-//                        .fillMaxWidth()
-//                        .clickable {
-//                            // 修改笔记
-//                            navController.navigate(NavRoute.NoteRoute.navigateRoute(note.id))
-//                        }) {
-//                    // 点击删除笔记
-//                    navController.navigate(NavRoute.DeleteNoteDialogRoute.navigateRoute(note.id))
-//                }
                 NoteItem(
                     note = note,
                     onNoteClick = { noteId ->

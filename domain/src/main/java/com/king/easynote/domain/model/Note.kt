@@ -18,6 +18,9 @@ data class Note(
     val created: Long = 0,
     @ColumnInfo(name = "images")
     val images: List<String> = emptyList(), // 新增图片URI列表
-    val audioPath: String? = null, // 音频路径
-    val duration: Int = 0 // 音频时长
+    val isRecording: Boolean = false, //是否录音
+    val isPlaying: Boolean = false, //音频是否播放
+    val audioPath: String = "", // 音频路径
+    val duration: Int = 0, // 音频时长(秒)
+    val audioNote: String = "" // 音频备注
 ): BaseNote()

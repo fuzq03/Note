@@ -5,10 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.king.easynote.domain.model.Note
 
-/**
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
- */
-@Database(entities = [Note::class], version = 2, exportSchema = false)
+@Database(entities = [Note::class], version = 3, exportSchema = false)
 @TypeConverters(ListConverter::class)
 abstract class NoteDatabase : RoomDatabase() {
 
