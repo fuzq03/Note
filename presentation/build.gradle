@@ -62,7 +62,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$versions.androidExtJunit"
     androidTestImplementation "androidx.test.espresso:espresso-core:$versions.espressoCore"
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$versions.compose"
-    debugImplementation "androidx.compose.ui:ui-tooling:$versions.compose"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$versions.compose"
 
     // Compose dependencies
@@ -70,6 +69,8 @@ dependencies {
     implementation "androidx.navigation:navigation-compose:$versions.navigationCompose"
     implementation "androidx.compose.material:material-icons-extended:$versions.compose"
     implementation "androidx.hilt:hilt-navigation-compose:$versions.hiltNavigationCompose"
+    implementation "androidx.compose.ui:ui-graphics:$versions.compose"
+    implementation "androidx.compose.ui:ui-tooling:$versions.compose"
 
     // 图片选择库
     implementation "com.github.dhaval2404:imagepicker:2.1"

@@ -116,6 +116,8 @@ sealed class NavRoute(val route: String) {
 
     object NoteListRoute : NavRoute("NoteListScreen")
 
+    object SettingsRoute : NavRoute("settings")
+
     object DeleteNoteDialogRoute : NavRoute("DeleteNoteDialogRoute") {
 
         override val arguments: List<NamedNavArgument>

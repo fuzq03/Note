@@ -8,6 +8,7 @@ import androidx.navigation.compose.dialog
 import com.king.easynote.presentation.DeleteNoteDialog
 import com.king.easynote.presentation.NoteListScreen
 import com.king.easynote.presentation.NoteScreen
+import com.king.easynote.presentation.SettingsScreen
 
 /**
  * 笔记导航图
@@ -26,6 +27,9 @@ fun NavGraphBuilder.noteNavGraph(navController: NavController) {
         // 笔记 - 保存（修改/增加）
         composable(navRoute = NavRoute.NoteRoute) {
             NoteScreen(navController = navController)
+        }
+        composable(navRoute = NavRoute.SettingsRoute) {
+            SettingsScreen(navController)
         }
         // 删除笔记对话框
         dialog(navRoute = NavRoute.DeleteNoteDialogRoute) {

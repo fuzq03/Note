@@ -4,6 +4,7 @@
     <string name="add">添加</string>
     <string name="delete">删除</string>
     <string name="save">保存</string>
+    <string name="settings_title">设置</string>
 
     <string name="content_is_empty">空空如也~</string>
 

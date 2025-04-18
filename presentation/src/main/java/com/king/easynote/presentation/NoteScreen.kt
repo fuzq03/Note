@@ -1,7 +1,13 @@
 package com.king.easynote.presentation
 
 import android.Manifest
+import android.content.ContentValues
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.provider.MediaStore
+import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,27 +25,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.rememberImagePainter
 import com.king.easynote.base.ui.theme.noteColors
+import com.king.easynote.base.ui.theme.textColors
 import com.king.easynote.domain.model.NoteType
 import com.king.easynote.presentation.component.InputField
+import com.king.easynote.presentation.share.ShareHelper
 import com.king.easynote.presentation.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -86,6 +94,140 @@ fun NoteScreen(
 }
 
 @Composable
+fun NoteTopBar(
+    title: String,
+    hint: String,
+    color: Color = Color.White,
+    noteType: NoteType,
+    onTitleChange: (String) -> Unit,
+    navController: NavController
+) {
+    val context = LocalContext.current
+    var showPreview by remember { mutableStateOf(false) }
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val view = LocalView.current
+
+    // 存储权限请求Launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted && previewBitmap != null) {
+            saveImageToGallery(context, previewBitmap!!)
+        } else {
+            Toast.makeText(context, "需要存储权限才能保存图片", Toast.LENGTH_SHORT).show()
+        }
+        showPreview = false
+    }
+
+
+    // 预览对话框
+    if (showPreview && previewBitmap != null) {
+        AlertDialog(
+            onDismissRequest = { showPreview = false },
+            title = { Text("笔记预览") },
+            buttons = {
+                Button(onClick = {
+                    if (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        saveImageToGallery(context, previewBitmap!!)
+                        showPreview = false
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    }
+                }) {
+                    Text("保存到相册")
+                }
+            },
+            text = {
+                previewBitmap?.let{
+                    Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "笔记预览"
+                    )
+                }
+            }
+        )
+    }
+
+    TopAppBar(
+        title = { // 标题
+            InputField(
+                value = title,
+                onValueChange = {
+                    onTitleChange(it)
+                },
+                hint = hint,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.h5,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) },
+        navigationIcon = {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+            }
+        },
+        actions = {
+            IconButton(onClick = {
+                when(noteType) {
+                    NoteType.AUDIO -> {
+                        Toast.makeText(context, "音频类笔记暂不支持分享", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        // 生成预览图
+
+                        previewBitmap = captureView(view)
+                        showPreview = true
+                    }
+                }
+            }) {
+                Icon(Icons.Default.Share, contentDescription = "分享")
+            }
+        },
+        backgroundColor = color
+    )
+}
+
+fun captureView(view: View): Bitmap {
+    val bitmap = Bitmap.createBitmap(
+        view.width,
+        view.height,
+        Bitmap.Config.ARGB_8888
+    )
+    view.draw(Canvas(bitmap))
+    return bitmap
+}
+
+// 保存图片到相册
+fun saveImageToGallery(context: Context, bitmap: Bitmap): Boolean {
+    return try {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "note_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        }
+
+        val uri = context.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        )
+
+        uri?.let {
+            context.contentResolver.openOutputStream(uri).use { outputStream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+            }
+            true
+        } ?: false
+    } catch (e: Exception) {
+        false
+    }
+}
+
+@Composable
 fun TextNoteScreen(
     navController: NavController,
     viewModel: NoteViewModel = hiltViewModel(),
@@ -110,6 +252,16 @@ fun TextNoteScreen(
                     contentDescription = stringResource(id = R.string.save)
                 )
             }
+        },
+        topBar = {
+                 NoteTopBar(
+                     title = viewState.title,
+                     hint = "文本笔记",
+                     onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
+                     noteType = viewState.type,
+                     navController = navController,
+                     color = Color(viewState.color)
+                 )
         },
         bottomBar = {
             Row(
@@ -145,20 +297,6 @@ fun TextNoteScreen(
                 .background(backgroundAnim.value)
                 .padding(16.dp)
         ) {
-            // 标题
-            InputField(
-                value = viewState.title,
-                onValueChange = {
-                    viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it))
-                },
-                hint = stringResource(id = R.string.hint_note_title),
-                singleLine = true,
-                textStyle = MaterialTheme.typography.h5,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
 
             Spacer(modifier = Modifier.padding(10.dp))
             // 内容
@@ -168,7 +306,7 @@ fun TextNoteScreen(
                     viewModel.onEvent(NoteViewModel.NoteEvent.ChangeContent(it))
                 },
                 hint = stringResource(id = R.string.hint_note_content),
-                textStyle = MaterialTheme.typography.h6,
+                textStyle = MaterialTheme.typography.h6.copy(color = textColors.get(Color(viewState.color)) ?: Color.White),
                 modifier = Modifier
                     .padding(bottom = it.calculateBottomPadding())
                     .fillMaxSize()
@@ -244,8 +382,17 @@ private fun ImageNoteScreen(
                     Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
                 }
             }
-
-    }) {
+        },
+        topBar = {
+            NoteTopBar(
+                title = viewModel.state.value.title,
+                hint = "图片笔记",
+                onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
+                noteType = viewModel.state.value.type,
+                navController = navController
+            )
+        }
+    ) {
         viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle("图片笔记"))
         val scope = rememberCoroutineScope()
         Column(Modifier.padding(it)) {
@@ -341,7 +488,17 @@ private fun AudioNoteScreen(
                     Icon(imageVector = Icons.Default.Save, contentDescription = "保存")
                 }
             }
-    }) {
+        },
+        topBar = {
+            NoteTopBar(
+                title = viewModel.state.value.title,
+                hint = "音频笔记",
+                onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
+                noteType = viewModel.state.value.type,
+                navController = navController
+            )
+        }
+    ) {
         viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle("音频笔记"))
         Column(Modifier.padding(it)) {
             // 播放控制

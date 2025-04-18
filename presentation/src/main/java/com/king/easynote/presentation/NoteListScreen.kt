@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +75,7 @@ fun NoteListScreen(
                 .fillMaxSize()
                 .padding(start = 16.dp, end = 16.dp, bottom = it.calculateBottomPadding())
         ) {
-            TopBar()
+            TopBar(navController)
             NoteListContent(navController, viewModel)
         }
     }
@@ -128,18 +129,29 @@ private fun NoteTypeSelectionDialog(
  * 顶部标题栏
  */
 @Composable
-private fun TopBar() {
+private fun TopBar(navController: NavController) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(all = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = stringResource(R.string.note_title),
             color = TitleColor,
             style = MaterialTheme.typography.h5
         )
+        IconButton(
+            onClick = { navController.navigate(NavRoute.SettingsRoute.route) },
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "设置",
+                tint = MaterialTheme.colors.primary
+            )
+        }
     }
 
 }
