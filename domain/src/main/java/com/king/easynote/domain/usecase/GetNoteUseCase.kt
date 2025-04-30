@@ -6,7 +6,6 @@ import com.king.easynote.domain.repository.NoteRepository
 
 /**
  * 获取笔记
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 class GetNoteUseCase(private val repository: NoteRepository) : UseCase<Int, Note?> {
 

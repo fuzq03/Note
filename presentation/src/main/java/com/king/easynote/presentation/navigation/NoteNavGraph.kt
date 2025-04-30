@@ -5,10 +5,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.*
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
-import com.king.easynote.presentation.DeleteNoteDialog
-import com.king.easynote.presentation.NoteListScreen
-import com.king.easynote.presentation.NoteScreen
-import com.king.easynote.presentation.SettingsScreen
+import com.king.easynote.presentation.*
 
 /**
  * 笔记导航图
@@ -30,6 +27,9 @@ fun NavGraphBuilder.noteNavGraph(navController: NavController) {
         }
         composable(navRoute = NavRoute.SettingsRoute) {
             SettingsScreen(navController)
+        }
+        composable("tagManagement") {
+            TagManagementScreen(navController = navController)
         }
         // 删除笔记对话框
         dialog(navRoute = NavRoute.DeleteNoteDialogRoute) {

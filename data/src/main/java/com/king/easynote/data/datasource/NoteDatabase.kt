@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.king.easynote.domain.model.Note
 
-@Database(entities = [Note::class], version = 3, exportSchema = false)
+@Database(entities = [Note::class], version = 4, exportSchema = false)
 @TypeConverters(ListConverter::class)
 abstract class NoteDatabase : RoomDatabase() {
 

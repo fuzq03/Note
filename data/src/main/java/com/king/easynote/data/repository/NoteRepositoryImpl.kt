@@ -9,7 +9,6 @@ import kotlinx.coroutines.withContext
 
 /**
  * NoteRepository 实现
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 class NoteRepositoryImpl(private val noteDao: NoteDao) : NoteRepository {
 

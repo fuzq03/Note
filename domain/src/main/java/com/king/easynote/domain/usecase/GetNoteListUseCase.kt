@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * 获取笔记列表
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 class GetNoteListUseCase(private val repository: NoteRepository) : UseCase<Unit, Flow<List<Note>>> {
 

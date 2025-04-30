@@ -1,34 +1,44 @@
 package com.king.easynote.presentation.viewmodel
 
+import android.app.Application
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.king.easynote.base.presentation.viewmodel.BaseViewModel
 import com.king.easynote.base.ui.theme.noteColors
+import com.king.easynote.data.datasource.CategoryDao
+import com.king.easynote.data.datasource.NoteDatabase
+import com.king.easynote.data.datasource.NoteExtraInfoDataBase
+import com.king.easynote.data.repository.CategoryRepositoryImpl
 import com.king.easynote.domain.exception.NoteException
+import com.king.easynote.domain.model.CategoryEntity
 import com.king.easynote.domain.model.Note
+import com.king.easynote.domain.model.NoteExtraInfoEntity
 import com.king.easynote.domain.model.NoteType
+import com.king.easynote.domain.repository.CategoryRepository
+import com.king.easynote.domain.usecase.DeleteCategoryUseCase
 import com.king.easynote.domain.usecase.NoteUseCases
+import com.king.easynote.domain.usecase.SaveCategoryUseCase
+import com.king.easynote.domain.usecase.SaveNoteExtraInfoUseCase
 import com.king.easynote.presentation.navigation.NavArgumentKey
 import com.king.easynote.presentation.navigation.NavRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import javax.inject.Inject
 
-/**
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
- */
+
 @HiltViewModel
 class NoteViewModel @Inject constructor(
     private val noteUseCases: NoteUseCases,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val application: Application,
 ) : BaseViewModel<NoteViewModel.NoteState, NoteViewModel.NoteEvent>(NoteState()) {
 
     private val _event = MutableSharedFlow<UIEvent>()
@@ -36,9 +46,19 @@ class NoteViewModel @Inject constructor(
     private var mediaRecorder: MediaRecorder? = null
     private var mediaPlayer: MediaPlayer? = null
     private var startTime: Long = 0
-    private lateinit var context: Context
 
     private var noteId: Int? = null
+
+    val noteExtraInfoDataBase = Room.databaseBuilder(
+        application,
+        NoteExtraInfoDataBase::class.java,
+        NoteExtraInfoDataBase.DATABASE_NAME
+    ).fallbackToDestructiveMigration()
+        .build()
+
+    private val categoryRepository: CategoryRepository = CategoryRepositoryImpl(noteExtraInfoDataBase.categoryDao())
+    private val saveCategoryUseCase = SaveCategoryUseCase(categoryRepository)
+    private val deleteCategoryUseCase = DeleteCategoryUseCase(categoryRepository)
 
     init {
         savedStateHandle.get<Int>(NavArgumentKey.NoteId.name)?.takeIf { it != NavRoute.NONE_ID }
@@ -57,15 +77,55 @@ class NoteViewModel @Inject constructor(
                             isPlaying = it.isPlaying, //音频是否播放
                             audioPath = it.audioPath, // 音频路径
                             duration = it.duration, // 音频时长(秒)
-                            audioNote = it.audioNote // 音频备注
+                            audioNote = it.audioNote, // 音频备注
+                            isStarred = it.isStarred,
+                            selectedCategory = it.category,
                         )
                     }
+
                 }
+
+
+
             }
+        viewModelScope.launch{
+            internalState.value = state.value.copy(categories = getCategories())
+        }
     }
 
+    suspend fun getCategories(): List<String>{
+        // 使用 map 操作符提取 name 并转换为 List<String>
+        val nameListFlow: Flow<List<String>> = getAllCategories().map { categoryList ->
+            categoryList.map { it.name }
+        }
+
+        // 将 Flow<List<String>> 转换为 List<String>
+        val allNameLists: List<String> = nameListFlow.first()
+
+        return allNameLists
+    }
+
+    fun saveCategory(id: Int, categoryName: String) {
+        viewModelScope.launch {
+            val category = CategoryEntity(id = id, name = categoryName)
+            saveCategoryUseCase(category)
+        }
+    }
+
+    fun deleteCategory(categoryName: String) {
+        viewModelScope.launch {
+            val category = CategoryEntity(name = categoryName)
+            deleteCategoryUseCase(category)
+        }
+    }
+
+    fun getAllCategories(): Flow<List<CategoryEntity>> {
+        return categoryRepository.getAllCategories()
+    }
+
+
     fun setContext(context: Context) {
-        this.context = context
+        //this.context = context
     }
 
     override fun onEvent(event: NoteEvent) {
@@ -120,12 +180,24 @@ class NoteViewModel @Inject constructor(
             is NoteEvent.AddImage -> {
                 internalState.value = state.value.copy(images = state.value.images + event.uri)
             }
+            is NoteEvent.SelectCategory -> {
+                internalState.value = internalState.value.copy(selectedCategory = event.name)
+                //saveNoteExtraInfo(event.name)
+            }
+            is NoteEvent.DeleteCategory -> {
+                deleteCategory(event.name)
+            }
+            is NoteEvent.ToggleStar -> {
+                internalState.value = internalState.value.copy(isStarred = event.isStarred)
+                //saveCategory(internalState.value.selectedCategory)
+
+            }
             else -> {}
         }
     }
     private fun startRecording() {
 
-        val cacheDir = context.externalCacheDir ?: run {
+        val cacheDir = application.externalCacheDir ?: run {
             viewModelScope.launch {
                 _event.emit(UIEvent.ShowMessage("无法访问存储目录"))
             }
@@ -236,7 +308,10 @@ class NoteViewModel @Inject constructor(
         val isPlaying: Boolean = false, //音频是否播放
         val audioPath: String = "", // 音频路径
         val duration: Int = 0, // 音频时长(秒)
-        val audioNote: String = "" // 音频备注
+        val audioNote: String = "", // 音频备注
+        val categories: List<String> = emptyList(),
+        val selectedCategory: String = "",
+        val isStarred: Boolean = false
     )
 
     /**
@@ -256,6 +331,10 @@ class NoteViewModel @Inject constructor(
         object PlayAudio : NoteEvent
         object PauseAudio : NoteEvent
         data class UpdateAudioNote(val note: String) : NoteEvent
+        data class AddCategory(val name: String) : NoteEvent
+        data class DeleteCategory(val name: String) : NoteEvent
+        data class SelectCategory(val name: String) : NoteEvent
+        data class ToggleStar(val isStarred: Boolean) : NoteEvent
     }
 
     /**

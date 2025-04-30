@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -47,7 +46,6 @@ import com.king.easynote.base.ui.theme.noteColors
 import com.king.easynote.base.ui.theme.textColors
 import com.king.easynote.domain.model.NoteType
 import com.king.easynote.presentation.component.InputField
-import com.king.easynote.presentation.share.ShareHelper
 import com.king.easynote.presentation.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -60,12 +58,45 @@ fun NoteScreen(
     navController: NavController,
     viewModel: NoteViewModel = hiltViewModel()
 ) {
+    val state by viewModel.state
 
+    // 添加分类下拉菜单
+    var showCategoryDialog by remember { mutableStateOf(false) }
     val scaffoldState = rememberScaffoldState()
     val noteType = remember {
         navController.currentBackStackEntry?.arguments?.getString("type")
             ?.let { NoteType.valueOf(it) } ?: NoteType.TEXT
     }
+
+    if (showCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showCategoryDialog = false },
+            title = { Text("选择分类") },
+            text = {
+                Column {
+                    state.categories.forEach { category ->
+                        Text(
+                            text = category,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.onEvent(NoteViewModel.NoteEvent.SelectCategory(category))
+                                    showCategoryDialog = false
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showCategoryDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+
     viewModel.onEvent(NoteViewModel.NoteEvent.SetType(noteType))
 
     LaunchedEffect(Unit) {
@@ -85,9 +116,15 @@ fun NoteScreen(
     }
 
     when(noteType) {
-        NoteType.TEXT -> TextNoteScreen(navController, viewModel, scaffoldState)
-        NoteType.IMAGE -> ImageNoteScreen(navController, viewModel, scaffoldState)
-        NoteType.AUDIO -> AudioNoteScreen(navController, viewModel, scaffoldState)
+        NoteType.TEXT -> TextNoteScreen(navController, viewModel, scaffoldState, showCategoryDialog) {
+            showCategoryDialog = it
+        }
+        NoteType.IMAGE -> ImageNoteScreen(navController, viewModel, scaffoldState, showCategoryDialog) {
+            showCategoryDialog = it
+        }
+        NoteType.AUDIO -> AudioNoteScreen(navController, viewModel, scaffoldState, showCategoryDialog) {
+            showCategoryDialog = it
+        }
     }
 
 
@@ -100,7 +137,12 @@ fun NoteTopBar(
     color: Color = Color.White,
     noteType: NoteType,
     onTitleChange: (String) -> Unit,
-    navController: NavController
+    navController: NavController,
+    categories: List<String>,
+    selectedCategory: String,
+    isStarred: Boolean,
+    onCategoryClick: () -> Unit,
+    onStarClick: () -> Unit
 ) {
     val context = LocalContext.current
     var showPreview by remember { mutableStateOf(false) }
@@ -173,6 +215,21 @@ fun NoteTopBar(
             }
         },
         actions = {
+            // 添加星标按钮
+            IconButton(onClick = onStarClick) {
+                Icon(
+                    if (isStarred) Icons.Default.Star else Icons.Default.StarOutline,
+                    contentDescription = "星标"
+                )
+            }
+            // 添加分类显示
+            Text(
+                text = selectedCategory,
+                modifier = Modifier
+                    .clickable(onClick = onCategoryClick)
+                    .padding(horizontal = 8.dp)
+                    .align(Alignment.CenterVertically)
+            )
             IconButton(onClick = {
                 when(noteType) {
                     NoteType.AUDIO -> {
@@ -231,7 +288,9 @@ fun saveImageToGallery(context: Context, bitmap: Bitmap): Boolean {
 fun TextNoteScreen(
     navController: NavController,
     viewModel: NoteViewModel = hiltViewModel(),
-    scaffoldState: ScaffoldState = rememberScaffoldState()
+    scaffoldState: ScaffoldState = rememberScaffoldState(),
+    showCategoryDialog: Boolean,
+    onShowCategoryDialogChange: (Boolean) -> Unit
 ){
     val viewState = viewModel.state.value
 
@@ -260,8 +319,14 @@ fun TextNoteScreen(
                      onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
                      noteType = viewState.type,
                      navController = navController,
-                     color = Color(viewState.color)
+                     color = Color(viewState.color),
+                     categories = viewState.categories,
+                     selectedCategory = viewState.selectedCategory,
+                     isStarred = viewState.isStarred,
+                     onCategoryClick = { onShowCategoryDialogChange(!showCategoryDialog) },
+                     onStarClick = { viewModel.onEvent(NoteViewModel.NoteEvent.ToggleStar(!viewState.isStarred))}
                  )
+
         },
         bottomBar = {
             Row(
@@ -331,7 +396,9 @@ fun TextNoteScreen(
 private fun ImageNoteScreen(
     navController: NavController,
     viewModel: NoteViewModel = hiltViewModel(),
-    scaffoldState: ScaffoldState = rememberScaffoldState()
+    scaffoldState: ScaffoldState = rememberScaffoldState(),
+    showCategoryDialog: Boolean,
+    onShowCategoryDialogChange: (Boolean) -> Unit
 ) {
     val state = viewModel.state.value
     val context = LocalContext.current
@@ -389,7 +456,12 @@ private fun ImageNoteScreen(
                 hint = "图片笔记",
                 onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
                 noteType = viewModel.state.value.type,
-                navController = navController
+                navController = navController,
+                categories = viewModel.state.value.categories,
+                selectedCategory = viewModel.state.value.selectedCategory,
+                isStarred = viewModel.state.value.isStarred,
+                onCategoryClick = { onShowCategoryDialogChange(!showCategoryDialog) },
+                onStarClick = { viewModel.onEvent(NoteViewModel.NoteEvent.ToggleStar(!viewModel.state.value.isStarred))}
             )
         }
     ) {
@@ -434,7 +506,9 @@ private fun ImageNoteScreen(
 private fun AudioNoteScreen(
     navController: NavController,
     viewModel: NoteViewModel = hiltViewModel(),
-    scaffoldState: ScaffoldState = rememberScaffoldState()
+    scaffoldState: ScaffoldState = rememberScaffoldState(),
+    showCategoryDialog: Boolean,
+    onShowCategoryDialogChange: (Boolean) -> Unit
 ) {
     val state = viewModel.state.value
     val context = LocalContext.current
@@ -495,7 +569,12 @@ private fun AudioNoteScreen(
                 hint = "音频笔记",
                 onTitleChange = { viewModel.onEvent(NoteViewModel.NoteEvent.ChangeTitle(it)) },
                 noteType = viewModel.state.value.type,
-                navController = navController
+                navController = navController,
+                categories = viewModel.state.value.categories,
+                selectedCategory = viewModel.state.value.selectedCategory,
+                isStarred = viewModel.state.value.isStarred,
+                onCategoryClick = { onShowCategoryDialogChange(!showCategoryDialog) },
+                onStarClick = { viewModel.onEvent(NoteViewModel.NoteEvent.ToggleStar(!viewModel.state.value.isStarred))}
             )
         }
     ) {

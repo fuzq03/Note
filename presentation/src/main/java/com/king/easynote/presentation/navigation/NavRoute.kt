@@ -8,7 +8,6 @@ import com.king.easynote.domain.model.NoteType
 
 /**
  * 导航路由
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 sealed class NavRoute(val route: String) {
 

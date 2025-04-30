@@ -22,5 +22,7 @@ data class Note(
     val isPlaying: Boolean = false, //音频是否播放
     val audioPath: String = "", // 音频路径
     val duration: Int = 0, // 音频时长(秒)
-    val audioNote: String = "" // 音频备注
+    val audioNote: String = "", // 音频备注
+    val category: String = "", // 新增：笔记对应的标签
+    val isStarred: Boolean = false // 新增：是否收藏
 ): BaseNote()

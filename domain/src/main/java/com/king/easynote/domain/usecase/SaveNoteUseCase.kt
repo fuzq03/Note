@@ -7,7 +7,6 @@ import com.king.easynote.domain.repository.NoteRepository
 
 /**
  * 保存笔记
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 class SaveNoteUseCase(private val repository: NoteRepository) : UseCase<Note, Unit> {
 

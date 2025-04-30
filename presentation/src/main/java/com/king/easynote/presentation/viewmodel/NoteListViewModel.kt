@@ -49,7 +49,7 @@ class NoteListViewModel @Inject constructor(private val noteUseCases: NoteUseCas
         internalState.value = state.value.copy(
             text = text,
             notes = if (text.isNotBlank()) originData.value.filter { note ->
-                note.title.contains(text) || note.content.contains(text)
+                note.title.contains(text) || note.content.contains(text) || note.category.contains(text)
             } else originData.value
         )
     }
