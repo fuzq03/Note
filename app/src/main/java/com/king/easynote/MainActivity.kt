@@ -17,9 +17,6 @@ import com.king.easynote.presentation.navigation.NavRoute
 import com.king.easynote.presentation.navigation.noteNavGraph
 import dagger.hilt.android.AndroidEntryPoint
 
-/**
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 

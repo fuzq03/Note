@@ -14,7 +14,6 @@ import javax.inject.Singleton
 
 /**
  * 注入
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 @InstallIn(SingletonComponent::class)
 @Module

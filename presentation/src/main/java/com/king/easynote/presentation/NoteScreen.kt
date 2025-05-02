@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +81,11 @@ fun NoteScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.onEvent(NoteViewModel.NoteEvent.SelectCategory(category))
+                                    viewModel.onEvent(
+                                        NoteViewModel.NoteEvent.SelectCategory(
+                                            category
+                                        )
+                                    )
                                     showCategoryDialog = false
                                 }
                                 .padding(8.dp)
@@ -223,13 +228,19 @@ fun NoteTopBar(
                 )
             }
             // 添加分类显示
-            Text(
-                text = selectedCategory,
-                modifier = Modifier
-                    .clickable(onClick = onCategoryClick)
-                    .padding(horizontal = 8.dp)
-                    .align(Alignment.CenterVertically)
-            )
+            if (selectedCategory.isEmpty()) {
+               IconButton(onClick = onCategoryClick) {
+                   Icon(Icons.Outlined.Label, contentDescription = "选择分类")
+               }
+            } else {
+                Text(
+                    text = selectedCategory,
+                    modifier = Modifier
+                        .clickable(onClick = onCategoryClick)
+                        .padding(horizontal = 8.dp)
+                        .align(Alignment.CenterVertically)
+                )
+            }
             IconButton(onClick = {
                 when(noteType) {
                     NoteType.AUDIO -> {
@@ -469,6 +480,37 @@ private fun ImageNoteScreen(
         val scope = rememberCoroutineScope()
         Column(Modifier.padding(it)) {
             LazyRow {
+                // 添加占位图项
+                item {
+                    Box(
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clickable {
+                                // 检查权限
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.READ_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    pickImageLauncher.launch("image/*")
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                }
+                            }
+                            .background(Color.LightGray.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "添加图片",
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text("点击插入图片")
+                        }
+                    }
+                }
+                //显示已选图片
                 items(state.images.size) {index ->
                     val image = state.images[index]
                     Image(

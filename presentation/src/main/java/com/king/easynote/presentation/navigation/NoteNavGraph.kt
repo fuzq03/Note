@@ -9,8 +9,6 @@ import com.king.easynote.presentation.*
 
 /**
  * 笔记导航图
- *
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 fun NavGraphBuilder.noteNavGraph(navController: NavController) {
     navigation(
@@ -30,6 +28,9 @@ fun NavGraphBuilder.noteNavGraph(navController: NavController) {
         }
         composable("tagManagement") {
             TagManagementScreen(navController = navController)
+        }
+        composable("sortOptionManagement") {
+            SortOptionManagementScreen(navController = navController)
         }
         // 删除笔记对话框
         dialog(navRoute = NavRoute.DeleteNoteDialogRoute) {

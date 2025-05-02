@@ -18,5 +18,8 @@
     <string name="delete_note_dialog_confirm">确定</string>
     <string name="delete_note_dialog_cancel">取消</string>
 
+    <string name="recently_used">最近使用</string>
+    <string name="frequently_used">高频使用</string>
+
 
 </resources>

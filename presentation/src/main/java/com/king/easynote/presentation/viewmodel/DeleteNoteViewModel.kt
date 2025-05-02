@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * 删除笔记
  */
 @HiltViewModel
 class DeleteNoteViewModel @Inject constructor(private val noteUseCases: NoteUseCases) :

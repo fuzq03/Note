@@ -2,34 +2,34 @@ package com.king.easynote.presentation.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import com.king.easynote.base.presentation.viewmodel.BaseViewModel
 import com.king.easynote.base.ui.theme.noteColors
-import com.king.easynote.data.datasource.CategoryDao
-import com.king.easynote.data.datasource.NoteDatabase
 import com.king.easynote.data.datasource.NoteExtraInfoDataBase
 import com.king.easynote.data.repository.CategoryRepositoryImpl
 import com.king.easynote.domain.exception.NoteException
 import com.king.easynote.domain.model.CategoryEntity
 import com.king.easynote.domain.model.Note
-import com.king.easynote.domain.model.NoteExtraInfoEntity
 import com.king.easynote.domain.model.NoteType
 import com.king.easynote.domain.repository.CategoryRepository
 import com.king.easynote.domain.usecase.DeleteCategoryUseCase
 import com.king.easynote.domain.usecase.NoteUseCases
 import com.king.easynote.domain.usecase.SaveCategoryUseCase
-import com.king.easynote.domain.usecase.SaveNoteExtraInfoUseCase
 import com.king.easynote.presentation.navigation.NavArgumentKey
 import com.king.easynote.presentation.navigation.NavRoute
+import com.king.easynote.presentation.search.SortOption
+import com.king.easynote.presentation.share.SaveSearchInfoUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.io.File
 import javax.inject.Inject
 
@@ -38,14 +38,16 @@ import javax.inject.Inject
 class NoteViewModel @Inject constructor(
     private val noteUseCases: NoteUseCases,
     savedStateHandle: SavedStateHandle,
-    private val application: Application,
+    val application: Application,
 ) : BaseViewModel<NoteViewModel.NoteState, NoteViewModel.NoteEvent>(NoteState()) {
 
     private val _event = MutableSharedFlow<UIEvent>()
+    private var _sortOption = mutableStateOf(SaveSearchInfoUtil.getSortOption(application))
     val event = _event.asSharedFlow()
     private var mediaRecorder: MediaRecorder? = null
     private var mediaPlayer: MediaPlayer? = null
     private var startTime: Long = 0
+    var sortOption = _sortOption.value
 
     private var noteId: Int? = null
 
@@ -64,24 +66,29 @@ class NoteViewModel @Inject constructor(
         savedStateHandle.get<Int>(NavArgumentKey.NoteId.name)?.takeIf { it != NavRoute.NONE_ID }
             ?.let {
                 viewModelScope.launch {
-                    noteUseCases.getNote.execute(it)?.also {
-                        noteId = it.id
-                        internalState.value = state.value.copy(
-                            title = it.title,
-                            content = it.content,
-                            color = it.color,
-                            type = it.type,
-                            imageCaption = it.content,
-                            images = it.images,
-                            isRecording = it.isRecording, //是否录音
-                            isPlaying = it.isPlaying, //音频是否播放
-                            audioPath = it.audioPath, // 音频路径
-                            duration = it.duration, // 音频时长(秒)
-                            audioNote = it.audioNote, // 音频备注
-                            isStarred = it.isStarred,
-                            selectedCategory = it.category,
-                        )
+                    try {
+                        noteUseCases.getNote.execute(it)?.let {
+                            noteId = it.id
+                            internalState.value = state.value.copy(
+                                title = it.title,
+                                content = it.content,
+                                color = it.color,
+                                type = it.type,
+                                imageCaption = it.content,
+                                images = it.images,
+                                isRecording = it.isRecording, //是否录音
+                                isPlaying = it.isPlaying, //音频是否播放
+                                audioPath = it.audioPath, // 音频路径
+                                duration = it.duration, // 音频时长(秒)
+                                audioNote = it.audioNote, // 音频备注
+                                isStarred = it.isStarred,
+                                selectedCategory = it.category,
+                            )
+                        }
+                    }catch (e: Exception) {
+                        Log.d("NoteViewModel", e.message.toString())
                     }
+
 
                 }
 
@@ -89,7 +96,8 @@ class NoteViewModel @Inject constructor(
 
             }
         viewModelScope.launch{
-            internalState.value = state.value.copy(categories = getCategories())
+            val list = getCategories()
+            internalState.value = state.value.copy(categories = list)
         }
     }
 
@@ -182,19 +190,24 @@ class NoteViewModel @Inject constructor(
             }
             is NoteEvent.SelectCategory -> {
                 internalState.value = internalState.value.copy(selectedCategory = event.name)
-                //saveNoteExtraInfo(event.name)
+                NoteEvent.SaveNote
             }
             is NoteEvent.DeleteCategory -> {
                 deleteCategory(event.name)
             }
             is NoteEvent.ToggleStar -> {
                 internalState.value = internalState.value.copy(isStarred = event.isStarred)
-                //saveCategory(internalState.value.selectedCategory)
-
+                NoteEvent.SaveNote
+            }
+            is NoteEvent.ChangeSortOption -> {
+                sortOption = event.option
+                SaveSearchInfoUtil.saveSortOption(event.option, application)
             }
             else -> {}
         }
     }
+
+
     private fun startRecording() {
 
         val cacheDir = application.externalCacheDir ?: run {
@@ -290,7 +303,9 @@ class NoteViewModel @Inject constructor(
             isPlaying = isPlaying,
             audioPath = audioPath,
             audioNote = audioNote,
-            duration = duration
+            duration = duration,
+            isStarred = isStarred,
+            category = selectedCategory
         )
     }
 
@@ -312,7 +327,11 @@ class NoteViewModel @Inject constructor(
         val categories: List<String> = emptyList(),
         val selectedCategory: String = "",
         val isStarred: Boolean = false
-    )
+    ){
+        init{
+            Log.d("111", "222")
+        }
+    }
 
     /**
      * 事件
@@ -335,6 +354,7 @@ class NoteViewModel @Inject constructor(
         data class DeleteCategory(val name: String) : NoteEvent
         data class SelectCategory(val name: String) : NoteEvent
         data class ToggleStar(val isStarred: Boolean) : NoteEvent
+        data class ChangeSortOption(val option: SortOption) : NoteEvent
     }
 
     /**

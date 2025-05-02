@@ -19,7 +19,6 @@ import com.king.easynote.presentation.viewmodel.DeleteNoteViewModel
 
 /**
  * 删除笔记对话框
- * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
  */
 @Composable
 fun DeleteNoteDialog(

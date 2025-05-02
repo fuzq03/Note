@@ -14,7 +14,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.king.easynote.domain.model.CategoryEntity
 import com.king.easynote.presentation.viewmodel.NoteViewModel
-import com.king.easynote.presentation.viewmodel.SettingsViewModel
+import com.king.easynote.presentation.search.SortOption
+import com.king.easynote.presentation.share.SaveSearchInfoUtil
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -46,6 +47,16 @@ fun SettingsScreen(
             // 这里添加设置项
             Text("主题设置", style = MaterialTheme.typography.h6)
             // 可以添加更多设置项...
+            // 排序选项管理项
+            TextButton(
+                onClick = {
+                    navController.navigate("sortOptionManagement")
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("搜索排序方式管理", style = MaterialTheme.typography.h6)
+            }
+
             // 标签管理项
             TextButton(
                 onClick = {
@@ -58,6 +69,56 @@ fun SettingsScreen(
         }
     }
 }
+
+@Composable
+fun SortOptionManagementScreen(
+    navController: NavController,
+    viewModel: NoteViewModel = hiltViewModel()
+) {
+    var selectedOption by remember { mutableStateOf(viewModel.sortOption) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // 返回按钮
+        Button(onClick = { navController.popBackStack() }) {
+            Text("返回")
+        }
+
+        // 显示排序选项列表
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
+        ) {
+            SortOption.values().forEach { option ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == option,
+                        onClick = {
+                            selectedOption = option
+                            SaveSearchInfoUtil.saveSortOption(option, viewModel.application)
+                        }
+                    )
+                    Text(
+                        text = when (option) {
+                            SortOption.RECENTLY_USED -> stringResource(R.string.recently_used)
+                            SortOption.FREQUENTLY_USED -> stringResource(R.string.frequently_used)
+                        },
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
 
 @Composable
 fun TagManagementScreen(navController: NavController, viewModel: NoteViewModel = hiltViewModel()) {
